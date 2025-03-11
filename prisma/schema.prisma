@@ -1,0 +1,175 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  name           String?
+  email          String?   @unique
+  emailVerified  DateTime?
+  image          String?
+  hashedPassword String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  role           Role      @default(STUDENT)
+
+  accounts Account[]
+  sessions Session[]
+
+  student    Student?
+  tutor      Tutor?
+}
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.String
+  access_token      String? @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.String
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  sessionToken String   @unique
+  userId       String   @db.ObjectId
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Student {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grade     String?
+  school    String?
+  subjects  String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookings Booking[]
+}
+
+model Tutor {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String   @unique @db.ObjectId
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio             String?
+  qualifications  String[]
+  subjects        String[]
+  yearsExperience Int?
+  hourlyRate      Float?
+  isVerified      Boolean  @default(false)
+  isAvailable     Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  bookings     Booking[]
+  availability Availability[]
+  reviews      Review[]
+}
+
+model Booking {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  studentId      String       @db.ObjectId
+  tutorId        String       @db.ObjectId
+  date           DateTime
+  startTime      DateTime
+  endTime        DateTime
+  status         BookingStatus @default(PENDING)
+  subject        String
+  notes          String?
+  meetingLink    String?
+  paymentStatus  PaymentStatus @default(UNPAID)
+  paymentId      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  tutor   Tutor   @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  review  Review?
+}
+
+model Review {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  bookingId String   @unique @db.ObjectId
+  tutorId   String   @db.ObjectId
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  tutor   Tutor   @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+}
+
+model Availability {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  tutorId   String   @db.ObjectId
+  dayOfWeek Int      // 0-6 (Sunday-Saturday)
+  startTime String   // HH:MM format
+  endTime   String   // HH:MM format
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tutor Tutor @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+
+  @@unique([tutorId, dayOfWeek, startTime, endTime])
+}
+
+model Subject {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String   @unique
+  category  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  STUDENT
+  TUTOR
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
